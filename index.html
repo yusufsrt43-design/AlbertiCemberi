@@ -222,6 +222,7 @@
         const totalChars = outerAlphabet.length;
         
         let currentOffset = 0;
+        let currentVisualAngle = 0; // Dönüşte tam tur atlamaması için biriken açı eklendi
         let isEncryptMode = true;
         let isDragMode = true;
 
@@ -306,27 +307,34 @@
         // --- BUTONLA DÖNDÜRME ---
         btnRight.addEventListener('click', () => {
             if (isDragMode) return;
-            currentOffset = (currentOffset + 1) % totalChars;
+            currentVisualAngle += (360 / totalChars);
             updateRotationWithAnimation();
         });
 
         btnLeft.addEventListener('click', () => {
             if (isDragMode) return;
-            currentOffset = (currentOffset - 1 + totalChars) % totalChars;
+            currentVisualAngle -= (360 / totalChars);
             updateRotationWithAnimation();
         });
 
+        // Tüm dönüş animasyonlarını ve arkaplandaki şifre mekanizmasını bu yürütür
         function updateRotationWithAnimation() {
             innerCircle.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
-            const angle = currentOffset * (360 / totalChars);
-            innerCircle.style.transform = `rotate(${angle}deg)`;
+            innerCircle.style.transform = `rotate(${currentVisualAngle}deg)`;
+            updateOffsetAndProcessText();
+        }
+
+        // Biriken görsel açıyı, 0-28 arası mantıksal indeks offset'ine geri çevirir
+        function updateOffsetAndProcessText() {
+            const angleStep = 360 / totalChars;
+            const steps = Math.round(currentVisualAngle / angleStep);
+            currentOffset = ((steps % totalChars) + totalChars) % totalChars;
             processText();
         }
 
         // --- SÜRÜKLE (DÖNDÜR) MEKANİZMASI ---
         let isDragging = false;
-        let startAngle = 0;
-        let startOffset = 0;
+        let lastTouchAngle = 0;
         let center = { x: 0, y: 0 };
         const angleStep = 360 / totalChars;
 
@@ -351,30 +359,36 @@
             isDragging = true;
             innerCircle.style.transition = 'none';
             center = getCenter(innerWrapper);
-            startAngle = getAngle(e);
-            startOffset = currentOffset;
+            lastTouchAngle = getAngle(e);
         }
 
         function onDragMove(e) {
             if (!isDragging || !isDragMode) return;
             if (e.type === 'touchmove') e.preventDefault();
             
-            const currentAngle = getAngle(e);
-            const deltaAngle = currentAngle - startAngle;
+            const currentTouchAngle = getAngle(e);
+            let deltaAngle = currentTouchAngle - lastTouchAngle;
             
-            const exactRotation = (startOffset * angleStep) + deltaAngle;
-            innerCircle.style.transform = `rotate(${exactRotation}deg)`;
+            // Açı sınırlarını (360) aştığında aniden geriye dönmesini engellemek için delta düzeltmesi
+            if (deltaAngle > 180) deltaAngle -= 360;
+            if (deltaAngle < -180) deltaAngle += 360;
             
-            currentOffset = Math.round(exactRotation / angleStep);
-            currentOffset = ((currentOffset % totalChars) + totalChars) % totalChars;
+            currentVisualAngle += deltaAngle;
+            lastTouchAngle = currentTouchAngle;
             
-            processText();
+            innerCircle.style.transform = `rotate(${currentVisualAngle}deg)`;
+            
+            updateOffsetAndProcessText();
         }
 
         function onDragEnd(e) {
             if (!isDragging || !isDragMode) return;
             isDragging = false;
-            innerCircle.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            
+            // Bırakıldığında en yakın harf kademesine yuvarla (Snap)
+            const steps = Math.round(currentVisualAngle / angleStep);
+            currentVisualAngle = steps * angleStep;
+            
             updateRotationWithAnimation();
         }
 
