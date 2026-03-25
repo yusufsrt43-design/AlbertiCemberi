@@ -3,13 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Alberti Çemberi Simülasyonu</title>
-    <!-- Tailwind CSS (Tasarım ve mobil uyumluluk için) -->
+    <title>Alberti Çemberi - Liquid Glass</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #0f172a; /* Koyu slate arka plan */
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        /* --- SIVI CAM (LIQUID GLASS) OPTİMİZASYONLARI --- */
+        
+        /* Sabit Paneller İçin Gerçek Blur (Telefonda sorun yaratmaz) */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+        }
+
+        .glass-input {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .glass-input:focus {
+            background: rgba(0, 0, 0, 0.3);
+            border-color: rgba(34, 211, 238, 0.5); /* Cyan glow */
+            outline: none;
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.2), inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Dış Çember (Sabit - Blur kullanılabilir) */
+        .outer-disk {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            box-shadow: 
+                inset 0 0 20px rgba(255, 255, 255, 0.05),
+                0 15px 35px rgba(0, 0, 0, 0.5);
+        }
+
+        /* İç Çember (Dönen - OPTİMİZASYON: Blur YOK, transparan gradient var) */
+        .inner-disk {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 
+                inset 0 2px 15px rgba(255,255,255,0.1),
+                0 4px 15px rgba(0, 0, 0, 0.4);
+            will-change: transform; /* GPU İvmelendirmesi */
+            transform: translateZ(0); /* Donanımsal render */
+        }
+
         /* Çemberlerin pürüzsüz dönmesi için animasyon */
         #inner-circle {
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            will-change: transform;
         }
         
         /* Harflerin daire etrafındaki konumlandırmaları */
@@ -26,136 +82,148 @@
             justify-content: center;
         }
 
-        /* Çemberin arka plan dokusu */
-        .disk-texture {
-            background-image: radial-gradient(circle, #e2e8f0 0%, #cbd5e1 100%);
-            box-shadow: inset 0 4px 6px -1px rgba(255, 255, 255, 0.5), 
-                        inset 0 -4px 6px -1px rgba(0, 0, 0, 0.1),
-                        0 10px 15px -3px rgba(0, 0, 0, 0.2);
-        }
-        .disk-texture-inner {
-            background-image: radial-gradient(circle, #f8fafc 0%, #e2e8f0 100%);
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2), 
-                        inset 0 2px 4px 0 rgba(255, 255, 255, 0.5);
-        }
+        .font-mono { font-family: 'Space Mono', monospace; }
 
         /* Sürükleme özellikleri */
         .draggable {
             cursor: grab;
-            touch-action: none; /* Mobilde sürüklerken sayfanın kaymasını engeller */
+            touch-action: none;
         }
         .draggable:active {
             cursor: grabbing;
         }
+
+        /* Arka Plan Sıvı Animasyonları (Sadece Opacity değişir, cihazı yormaz) */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+        .blob {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: -1;
+            pointer-events: none;
+            animation: pulse-slow 8s ease-in-out infinite alternate;
+        }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased overflow-x-hidden flex flex-col justify-center">
+<body class="min-h-screen flex flex-col justify-center relative">
 
-    <div class="max-w-md mx-auto p-4 sm:p-6 w-full">
+    <!-- Sıvı Arka Plan Efektleri -->
+    <div class="blob bg-cyan-600/40 w-[300px] h-[300px] top-[-50px] left-[-50px]"></div>
+    <div class="blob bg-purple-600/40 w-[400px] h-[400px] bottom-[-100px] right-[-100px]" style="animation-delay: -4s;"></div>
+    <div class="blob bg-blue-600/30 w-[200px] h-[200px] top-[40%] left-[30%]" style="animation-delay: -2s;"></div>
+
+    <div class="max-w-md mx-auto p-4 w-full relative z-10">
         
-        <!-- Çember (Disk) Bölümü -->
-        <div class="relative w-[85vw] max-w-[320px] h-[85vw] max-h-[320px] mx-auto mb-6 mt-6 rounded-full">
+        <!-- Ana Cam Panel -->
+        <div class="glass-panel rounded-3xl p-5 sm:p-6">
             
-            <!-- Dış Çember (Sabit) -->
-            <div id="outer-circle" class="absolute inset-0 rounded-full disk-texture text-slate-800 border-4 border-slate-700 shadow-xl">
-                <!-- İşaretçi (Index Pointer) -->
-                <div class="absolute top-0 left-1/2 -ml-2 -mt-3 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-transparent border-t-red-600 z-10 drop-shadow-md"></div>
-            </div>
+            <!-- Başlık -->
+            <h1 class="text-center text-xl font-semibold mb-6 tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-purple-300">
+                Alberti Çemberi
+            </h1>
 
-            <!-- İç Çember (Dönen ve Sürüklenebilen) -->
-            <div id="inner-circle-wrapper" class="absolute inset-[18%] rounded-full disk-texture-inner text-blue-900 border-2 border-slate-400 z-0 draggable shadow-md hover:shadow-lg transition-shadow">
-                <div id="inner-circle" class="w-full h-full relative rounded-full"></div>
-            </div>
-            
-            <!-- Çemberin Göbeği (Süsleme) -->
-            <div class="absolute inset-[45%] rounded-full bg-slate-300 shadow-inner border border-slate-400 flex items-center justify-center z-10 pointer-events-none">
-                <div class="w-3 h-3 bg-slate-500 rounded-full"></div>
-            </div>
-        </div>
-
-        <!-- Kontrol Mekanizması ve Mod Seçici -->
-        <div class="mb-6 flex flex-col items-center">
-            
-            <!-- Yön Butonları (Eski Switch'in Yeri - Varsayılan olarak gizli) -->
-            <div id="button-controls" class="hidden flex items-center justify-center gap-8 mb-4 w-full">
-                <button id="btn-left" class="bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white p-3 rounded-full transition-all touch-manipulation shadow-lg border border-slate-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-                </button>
-                <button id="btn-right" class="bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white p-3 rounded-full transition-all touch-manipulation shadow-lg border border-slate-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </button>
-            </div>
-
-            <!-- Kullanıcıya Bilgi Mesajı -->
-            <p id="drag-instruction" class="text-slate-400 text-xs mb-3 uppercase tracking-widest flex items-center justify-center gap-2 transition-opacity h-4">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                Şifreyi Değiştirmek İçin İç Daireyi Döndürün
-            </p>
-
-            <!-- Alt Kontrol Paneli: Aktif Anahtar ve Switch -->
-            <div class="flex flex-row items-stretch justify-center gap-2 sm:gap-3 w-full">
+            <!-- Çember (Disk) Bölümü -->
+            <div class="relative w-[75vw] max-w-[280px] h-[75vw] max-h-[280px] mx-auto mb-8 rounded-full">
                 
-                <!-- Aktif Anahtar -->
-                <div class="flex items-center bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 shadow-lg min-w-[140px] justify-center flex-1">
-                    <span class="text-slate-400 text-[10px] sm:text-xs uppercase font-semibold mr-2">Aktif Anahtar:</span>
-                    <span id="key-display" class="text-lg sm:text-xl font-bold text-emerald-400 font-mono tracking-widest">A=A</span>
+                <!-- Dış Çember (Sabit) -->
+                <div id="outer-circle" class="absolute inset-0 rounded-full outer-disk text-slate-200">
+                    <!-- İşaretçi (Neon Pointer) -->
+                    <div class="absolute -top-1 left-1/2 -ml-[6px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[10px] border-transparent border-t-cyan-400 z-10 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
                 </div>
 
-                <!-- Switch (Sürükle / Buton) İkonlu -->
-                <div class="flex items-center justify-center gap-2 bg-slate-800 border border-slate-600 px-3 py-2 rounded-lg shadow-lg">
-                    <!-- Buton İkonu (Oklar) -->
-                    <svg id="icon-btn" class="w-5 h-5 text-slate-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Buton Modu"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                    
-                    <button id="mode-toggle" class="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600 transition-colors focus:outline-none shadow-inner mx-1" aria-label="Kontrol modunu değiştir">
-                        <span id="mode-toggle-thumb" class="inline-block h-4 w-4 translate-x-6 rounded-full bg-white transition-transform shadow transform"></span>
-                    </button>
-                    
-                    <!-- Sürükle İkonu (El/Tutma) -->
-                    <svg id="icon-drag" class="w-5 h-5 text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-label="Sürükle Modu"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"></path></svg>
+                <!-- İç Çember (Dönen ve Sürüklenebilen - Optimize Edilmiş) -->
+                <div id="inner-circle-wrapper" class="absolute inset-[18%] rounded-full inner-disk text-cyan-300 z-0 draggable">
+                    <div id="inner-circle" class="w-full h-full relative rounded-full"></div>
                 </div>
-
+                
+                <!-- Çemberin Göbeği (Süsleme) -->
+                <div class="absolute inset-[44%] rounded-full bg-white/10 backdrop-blur-sm border border-white/20 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),0_4px_8px_rgba(0,0,0,0.5)] flex items-center justify-center z-10 pointer-events-none">
+                    <div class="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]"></div>
+                </div>
             </div>
-        </div>
 
-        <!-- Şifreleme/Çözme Paneli -->
-        <div class="bg-slate-800 rounded-2xl p-4 shadow-xl border border-slate-700 relative z-20">
-            
-            <!-- Mod Seçici -->
-            <div class="flex bg-slate-900 rounded-lg p-1 mb-4 shadow-inner">
-                <button id="mode-encrypt" class="flex-1 py-2 text-sm font-medium rounded-md bg-blue-600 text-white shadow transition-all">Şifrele</button>
-                <button id="mode-decrypt" class="flex-1 py-2 text-sm font-medium rounded-md text-slate-400 hover:text-white transition-all">Şifre Çöz</button>
+            <!-- Kontrol Mekanizması ve Mod Seçici -->
+            <div class="mb-6 flex flex-col items-center">
+                
+                <!-- Yön Butonları (Eski Switch'in Yeri - Varsayılan olarak gizli) -->
+                <div id="button-controls" class="hidden flex items-center justify-center gap-6 mb-4 w-full">
+                    <button id="btn-left" class="bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-cyan-300 p-3 rounded-full transition-all touch-manipulation shadow-lg backdrop-blur-sm">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                    </button>
+                    <button id="btn-right" class="bg-white/5 hover:bg-white/10 active:bg-white/20 border border-white/10 text-cyan-300 p-3 rounded-full transition-all touch-manipulation shadow-lg backdrop-blur-sm">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </button>
+                </div>
+
+                <!-- Kullanıcıya Bilgi Mesajı -->
+                <p id="drag-instruction" class="text-cyan-200/60 text-[10px] mb-4 uppercase tracking-widest flex items-center justify-center gap-2 transition-opacity h-4 font-semibold">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                    Döndürmek için sürükleyin
+                </p>
+
+                <!-- Alt Kontrol Paneli: Aktif Anahtar ve Switch -->
+                <div class="flex flex-row items-stretch justify-center gap-2 sm:gap-3 w-full">
+                    
+                    <!-- Aktif Anahtar -->
+                    <div class="flex items-center bg-black/20 border border-white/10 rounded-xl px-4 py-2 shadow-inner min-w-[140px] justify-center flex-1">
+                        <span class="text-white/50 text-[10px] sm:text-xs uppercase font-semibold mr-2">Anahtar:</span>
+                        <span id="key-display" class="text-lg sm:text-xl font-bold text-cyan-400 font-mono tracking-widest drop-shadow-[0_0_5px_rgba(34,211,238,0.5)]">A=A</span>
+                    </div>
+
+                    <!-- Switch (Sürükle / Buton) -->
+                    <div class="flex items-center justify-center gap-2 bg-black/20 border border-white/10 px-3 py-2 rounded-xl shadow-inner">
+                        <svg id="icon-btn" class="w-4 h-4 text-white/30 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        
+                        <button id="mode-toggle" class="relative inline-flex h-5 w-9 items-center rounded-full bg-cyan-500/80 transition-colors focus:outline-none shadow-inner mx-1 border border-white/20">
+                            <span id="mode-toggle-thumb" class="inline-block h-3.5 w-3.5 translate-x-4 rounded-full bg-white transition-transform shadow transform"></span>
+                        </button>
+                        
+                        <svg id="icon-drag" class="w-4 h-4 text-cyan-300 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5v-1a1.5 1.5 0 013 0v1m0 0V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11"></path></svg>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Mod Seçici (Şifrele/Çöz) -->
+            <div class="flex bg-black/30 border border-white/5 rounded-xl p-1 mb-5 shadow-inner">
+                <button id="mode-encrypt" class="flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-white/10 text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] border border-white/10 transition-all">Şifrele</button>
+                <button id="mode-decrypt" class="flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg text-white/50 hover:text-white transition-all border border-transparent">Şifre Çöz</button>
             </div>
 
             <!-- Giriş Alanı -->
             <div class="mb-4">
-                <label class="block text-xs text-slate-400 uppercase mb-1 font-semibold">Metin</label>
-                <textarea id="input-text" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-slate-600 shadow-inner resize-none" placeholder="Buraya yazın..."></textarea>
+                <label class="block text-[10px] text-cyan-200/60 uppercase mb-1.5 font-bold tracking-wider ml-1">Metin Girişi</label>
+                <textarea id="input-text" rows="3" class="w-full glass-input rounded-xl p-3 text-white transition-all placeholder-white/30 resize-none font-mono text-sm" placeholder="Buraya yazın..."></textarea>
             </div>
 
             <!-- Çıkış Alanı -->
-            <div class="relative">
-                <label class="block text-xs text-slate-400 uppercase mb-1 font-semibold">Sonuç</label>
-                <div id="output-text" class="w-full min-h-[5rem] bg-slate-700 border border-slate-600 rounded-lg p-3 text-emerald-400 font-mono break-words flex items-center shadow-inner"></div>
+            <div class="relative mt-2">
+                <label class="block text-[10px] text-cyan-200/60 uppercase mb-1.5 font-bold tracking-wider ml-1">Sonuç</label>
+                <div id="output-text" class="w-full min-h-[4rem] bg-black/40 border border-white/5 rounded-xl p-3 pb-8 text-cyan-300 font-mono text-sm break-words flex items-start shadow-inner"></div>
                 
-                <button id="btn-copy" class="absolute right-2 bottom-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-600 p-1.5 rounded-md transition-colors" title="Kopyala">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                </button>
+                <div class="absolute right-2 bottom-2 flex items-center gap-2">
+                    <span id="copy-toast" class="text-cyan-300 text-[10px] font-bold tracking-wider uppercase opacity-0 transition-opacity pointer-events-none drop-shadow-md">Kopyalandı!</span>
+                    <button id="btn-copy" class="text-white/50 hover:text-cyan-300 bg-white/5 hover:bg-white/10 border border-white/10 p-1.5 rounded-lg transition-all" title="Kopyala">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                </div>
             </div>
-            <!-- Kopyalandı Uyarı Mesajı -->
-            <div id="copy-toast" class="text-emerald-400 text-xs text-right mt-1 opacity-0 transition-opacity pointer-events-none">Kopyalandı!</div>
 
         </div>
     </div>
 
     <script>
-        // Türkçe 29 Harfli Alfabeler - İkisi de alfabetik olarak sıralandı
+        // Türkçe 29 Harfli Alfabeler
         const outerAlphabet = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ";
         const innerAlphabet = "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ";
-        const totalChars = outerAlphabet.length; // 29
+        const totalChars = outerAlphabet.length;
         
-        let currentOffset = 0; // 0 ile 28 arası dönüş miktarı
+        let currentOffset = 0;
         let isEncryptMode = true;
-        let isDragMode = true; // Sürükle / Buton modu durumu
+        let isDragMode = true;
 
         // DOM Elementleri
         const outerCircle = document.getElementById('outer-circle');
@@ -169,7 +237,6 @@
         const copyToast = document.getElementById('copy-toast');
         const keyDisplay = document.getElementById('key-display');
         
-        // Yeni DOM Elementleri (Kontrol Modu İçin)
         const modeToggleBtn = document.getElementById('mode-toggle');
         const modeToggleThumb = document.getElementById('mode-toggle-thumb');
         const iconBtn = document.getElementById('icon-btn');
@@ -188,9 +255,7 @@
                 const letterWrap = document.createElement('div');
                 letterWrap.className = 'letter-wrap';
                 
-                // Harflerin dairesel koordinatlarını hesaplama (Trigonometri)
                 const angleDeg = index * angleStep;
-                // -90 derece ekleyerek A harfinin en tepeden (saat 12 yönünden) başlamasını sağlıyoruz
                 const angleRad = (angleDeg - 90) * (Math.PI / 180); 
                 
                 const x = Math.cos(angleRad) * radiusPercent;
@@ -198,52 +263,47 @@
 
                 letterWrap.style.left = `calc(50% + ${x}%)`;
                 letterWrap.style.top = `calc(50% + ${y}%)`;
-                // Harfleri merkeze doğru döndür
                 letterWrap.style.transform = `rotate(${angleDeg}deg)`;
 
                 const letterSpan = document.createElement('span');
                 letterSpan.innerText = char;
-                letterSpan.className = `font-bold font-mono ${isInner ? 'text-[10px] sm:text-[11px]' : 'text-xs sm:text-sm'}`;
+                // İç ve dış harf boyutları - mobil uyumlu
+                letterSpan.className = `font-bold font-mono ${isInner ? 'text-[9px] sm:text-[10px]' : 'text-[11px] sm:text-xs'}`;
                 
                 letterWrap.appendChild(letterSpan);
                 container.appendChild(letterWrap);
             });
         }
 
-        // Çemberleri oluştur
         drawLetters(outerCircle, outerAlphabet, 42, false);
-        drawLetters(innerCircle, innerAlphabet, 37, true);
+        drawLetters(innerCircle, innerAlphabet, 36, true);
 
-        // --- KONTROL MODU DEĞİŞTİRME (SÜRÜKLE / BUTON) ---
+        // --- KONTROL MODU DEĞİŞTİRME ---
         modeToggleBtn.addEventListener('click', () => {
             isDragMode = !isDragMode;
             
             if (isDragMode) {
-                // Sürükle Moduna Geçiş
-                modeToggleBtn.classList.replace('bg-slate-600', 'bg-blue-600');
-                modeToggleThumb.classList.replace('translate-x-1', 'translate-x-6');
-                iconDrag.classList.replace('text-slate-400', 'text-white');
-                iconBtn.classList.replace('text-white', 'text-slate-400');
+                modeToggleBtn.classList.replace('bg-white/20', 'bg-cyan-500/80');
+                modeToggleThumb.classList.replace('translate-x-1', 'translate-x-4');
+                iconDrag.classList.replace('text-white/30', 'text-cyan-300');
+                iconBtn.classList.replace('text-cyan-300', 'text-white/30');
                 
                 buttonControls.classList.add('hidden');
                 dragInstruction.style.opacity = '1';
-                
                 innerWrapper.classList.add('draggable');
             } else {
-                // Buton Moduna Geçiş
-                modeToggleBtn.classList.replace('bg-blue-600', 'bg-slate-600');
-                modeToggleThumb.classList.replace('translate-x-6', 'translate-x-1');
-                iconDrag.classList.replace('text-white', 'text-slate-400');
-                iconBtn.classList.replace('text-slate-400', 'text-white');
+                modeToggleBtn.classList.replace('bg-cyan-500/80', 'bg-white/20');
+                modeToggleThumb.classList.replace('translate-x-4', 'translate-x-1');
+                iconDrag.classList.replace('text-cyan-300', 'text-white/30');
+                iconBtn.classList.replace('text-white/30', 'text-cyan-300');
                 
                 buttonControls.classList.remove('hidden');
-                dragInstruction.style.opacity = '0'; // Yer tutması için tamamen kaldırmak yerine görünmez yapıyoruz
-                
+                dragInstruction.style.opacity = '0';
                 innerWrapper.classList.remove('draggable');
             }
         });
 
-        // --- BUTONLA DÖNDÜRME MEKANİZMASI ---
+        // --- BUTONLA DÖNDÜRME ---
         btnRight.addEventListener('click', () => {
             if (isDragMode) return;
             currentOffset = (currentOffset + 1) % totalChars;
@@ -257,7 +317,7 @@
         });
 
         function updateRotationWithAnimation() {
-            innerCircle.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+            innerCircle.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
             const angle = currentOffset * (360 / totalChars);
             innerCircle.style.transform = `rotate(${angle}deg)`;
             processText();
@@ -285,11 +345,11 @@
         }
 
         function onDragStart(e) {
-            if (!isDragMode) return; // Buton modundaysa sürüklemeyi iptal et
+            if (!isDragMode) return;
             if (e.type === 'touchstart') e.preventDefault();
             
             isDragging = true;
-            innerCircle.style.transition = 'none'; // Sürüklerken pürüzsüz dönmesi için
+            innerCircle.style.transition = 'none';
             center = getCenter(innerWrapper);
             startAngle = getAngle(e);
             startOffset = currentOffset;
@@ -302,13 +362,11 @@
             const currentAngle = getAngle(e);
             const deltaAngle = currentAngle - startAngle;
             
-            // Gerçek fiziksel dönüş açısı
             const exactRotation = (startOffset * angleStep) + deltaAngle;
             innerCircle.style.transform = `rotate(${exactRotation}deg)`;
             
-            // Arka planda şifrelemeyi anlık güncellemek için mantıksal ofseti bul
             currentOffset = Math.round(exactRotation / angleStep);
-            currentOffset = ((currentOffset % totalChars) + totalChars) % totalChars; // Negatif değerleri düzelt
+            currentOffset = ((currentOffset % totalChars) + totalChars) % totalChars;
             
             processText();
         }
@@ -317,10 +375,9 @@
             if (!isDragging || !isDragMode) return;
             isDragging = false;
             innerCircle.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-            updateRotationWithAnimation(); // En yakın harfe hizala (Snap)
+            updateRotationWithAnimation();
         }
 
-        // Sürükleme Event Listener'ları Ekle
         innerWrapper.addEventListener('mousedown', onDragStart);
         document.addEventListener('mousemove', onDragMove);
         document.addEventListener('mouseup', onDragEnd);
@@ -329,18 +386,14 @@
         document.addEventListener('touchmove', onDragMove, { passive: false });
         document.addEventListener('touchend', onDragEnd);
 
-        // Metin İşleme (Şifreleme veya Çözme)
+        // --- METİN İŞLEME ---
         function processText() {
-            // Türkçe karakterleri koruyarak büyük harfe çevir
             const text = inputText.value.toLocaleUpperCase('tr-TR');
             let result = '';
 
-            // 1. Anahtar Göstergesini Güncelle (Dış A harfinin İç Hangi Harfe Denk Geldiği)
-            // A harfinin outerAlphabet'teki indisi 0'dır.
             const innerIndexForA = (0 - currentOffset + totalChars) % totalChars;
             keyDisplay.innerText = `A=${innerAlphabet[innerIndexForA]}`;
 
-            // 2. Metni Şifrele/Çöz
             for (let i = 0; i < text.length; i++) {
                 const char = text[i];
                 
@@ -350,7 +403,6 @@
                         const innerIndex = (outerIndex - currentOffset + totalChars) % totalChars;
                         result += innerAlphabet[innerIndex];
                     } else {
-                        // Harf değilse (boşluk, nokta vs.) aynen bırak
                         result += char; 
                     }
                 } else {
@@ -364,55 +416,58 @@
                 }
             }
             
-            // Eğer giriş boşsa yer tutucu bir metin göster
             if (result === '') {
-                outputText.innerHTML = '<span class="text-slate-500 italic">Sonuç burada görünecek...</span>';
+                outputText.innerHTML = '<span class="text-white/30 italic">Şifrelenmiş metin...</span>';
             } else {
                 outputText.innerText = result;
             }
         }
 
-        // --- DİĞER OLAY DİNLEYİCİLERİ ---
-
-        // Metin yazıldıkça anlık çeviri yap
         inputText.addEventListener('input', processText);
 
-        // Mod Değiştirme (Şifrele / Çöz)
         modeEncrypt.addEventListener('click', () => {
             isEncryptMode = true;
-            modeEncrypt.className = "flex-1 py-2 text-sm font-medium rounded-md bg-blue-600 text-white shadow transition-all";
-            modeDecrypt.className = "flex-1 py-2 text-sm font-medium rounded-md text-slate-400 hover:text-white transition-all";
+            modeEncrypt.className = "flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-white/10 text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] border border-white/10 transition-all";
+            modeDecrypt.className = "flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg text-white/50 hover:text-white transition-all border border-transparent";
             processText();
         });
 
         modeDecrypt.addEventListener('click', () => {
             isEncryptMode = false;
-            modeDecrypt.className = "flex-1 py-2 text-sm font-medium rounded-md bg-purple-600 text-white shadow transition-all";
-            modeEncrypt.className = "flex-1 py-2 text-sm font-medium rounded-md text-slate-400 hover:text-white transition-all";
+            modeDecrypt.className = "flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-white/10 text-white shadow-[0_2px_8px_rgba(0,0,0,0.2)] border border-white/10 transition-all";
+            modeEncrypt.className = "flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg text-white/50 hover:text-white transition-all border border-transparent";
             processText();
         });
 
-        // Kopyalama Butonu
+        // Kopyalama
         btnCopy.addEventListener('click', () => {
-            if (outputText.innerText && outputText.innerText !== 'Sonuç burada görünecek...') {
-                navigator.clipboard.writeText(outputText.innerText).then(() => {
-                    copyToast.style.opacity = '1';
-                    setTimeout(() => { copyToast.style.opacity = '0'; }, 2000);
-                }).catch(err => {
+            if (outputText.innerText && outputText.innerText !== 'Şifrelenmiş metin...') {
+                const textToCopy = outputText.innerText;
+                
+                // Fallback kopyalama yöntemi (mobil browserlar için)
+                const copyFallback = () => {
                     const textarea = document.createElement('textarea');
-                    textarea.value = outputText.innerText;
+                    textarea.value = textToCopy;
                     document.body.appendChild(textarea);
                     textarea.select();
-                    document.execCommand('copy');
+                    try { document.execCommand('copy'); } catch(e) {}
                     document.body.removeChild(textarea);
-                    
+                    showToast();
+                };
+
+                const showToast = () => {
                     copyToast.style.opacity = '1';
                     setTimeout(() => { copyToast.style.opacity = '0'; }, 2000);
-                });
+                };
+
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(textToCopy).then(showToast).catch(copyFallback);
+                } else {
+                    copyFallback();
+                }
             }
         });
 
-        // Başlangıç durumu
         processText();
 
     </script>
